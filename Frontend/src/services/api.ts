@@ -1,118 +1,135 @@
 import type { User, Tag, FileItem, Folder } from '../types';
 
-let mockUser: User | null = null;
-let mockTags: Tag[] = [
-  { id: '1', name: '重要', color: '#ef4444' },
-  { id: '2', name: '作業中', color: '#3b82f6' },
-];
-let mockFolders: Folder[] = [
-  { id: 'root', name: 'ルート', parentId: null, children: [] },
-];
-let mockFiles: FileItem[] = [];
+const API_BASE_URL = 'http://localhost:3000/api';
 
-let tagIdCounter = 3;
-let folderIdCounter = 1;
-let fileIdCounter = 1;
+// Token management
+let authToken: string | null = null;
+
+const getAuthHeaders = (): HeadersInit => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  return headers;
+};
+
+const handleResponse = async (response: Response) => {
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'An error occurred' }));
+    throw new Error(error.message || `HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+};
 
 export const api = {
   login: async (username: string, password: string): Promise<User> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
 
-    if (username === 'user' && password === 'pass') {
-      mockUser = { id: '1', username };
-      return mockUser;
-    }
-
-    throw new Error('ユーザー名またはパスワードが正しくありません');
+    const data = await handleResponse(response);
+    authToken = data.token;
+    return { id: data.id, username: data.username };
   },
 
   logout: async (): Promise<void> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    mockUser = null;
+    await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    authToken = null;
   },
 
   getCurrentUser: async (): Promise<User | null> => {
-    return mockUser;
+    if (!authToken) return null;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/user`, {
+        headers: getAuthHeaders(),
+      });
+      return await handleResponse(response);
+    } catch {
+      authToken = null;
+      return null;
+    }
   },
 
   getTags: async (): Promise<Tag[]> => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return [...mockTags];
+    const response = await fetch(`${API_BASE_URL}/tags`, {
+      headers: getAuthHeaders(),
+    });
+    return await handleResponse(response);
   },
 
   createTag: async (name: string, color: string): Promise<Tag> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const newTag: Tag = {
-      id: String(tagIdCounter++),
-      name,
-      color,
-    };
-    mockTags.push(newTag);
-    return newTag;
+    const response = await fetch(`${API_BASE_URL}/tags`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ name, color }),
+    });
+    return await handleResponse(response);
   },
 
   updateTag: async (id: string, name: string, color: string): Promise<Tag> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const tag = mockTags.find(t => t.id === id);
-    if (!tag) throw new Error('タグが見つかりません');
-
-    tag.name = name;
-    tag.color = color;
-
-    mockFiles.forEach(file => {
-      if (file.tags.includes(id)) {
-      }
+    const response = await fetch(`${API_BASE_URL}/tags/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ name, color }),
     });
-
-    return { ...tag };
+    return await handleResponse(response);
   },
 
   deleteTag: async (id: string): Promise<void> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    mockTags = mockTags.filter(t => t.id !== id);
-
-    mockFiles.forEach(file => {
-      file.tags = file.tags.filter(tagId => tagId !== id);
+    const response = await fetch(`${API_BASE_URL}/tags/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
     });
+    if (!response.ok) {
+      throw new Error(`Failed to delete tag: ${response.status}`);
+    }
   },
 
   getFolders: async (): Promise<Folder[]> => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return buildFolderTree(mockFolders);
+    const response = await fetch(`${API_BASE_URL}/folders`, {
+      headers: getAuthHeaders(),
+    });
+    return await handleResponse(response);
   },
 
   createFolder: async (name: string, parentId: string): Promise<Folder> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const newFolder: Folder = {
-      id: `folder-${folderIdCounter++}`,
-      name,
-      parentId,
-      children: [],
-    };
-    mockFolders.push(newFolder);
-    return newFolder;
+    const response = await fetch(`${API_BASE_URL}/folders`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ name, parentId }),
+    });
+    return await handleResponse(response);
   },
 
   deleteFolder: async (id: string): Promise<void> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    const getAllChildFolderIds = (folderId: string): string[] => {
-      const children = mockFolders.filter(f => f.parentId === folderId);
-      const allIds = [folderId];
-      children.forEach(child => {
-        allIds.push(...getAllChildFolderIds(child.id));
-      });
-      return allIds;
-    };
-
-    const folderIdsToDelete = getAllChildFolderIds(id);
-    mockFiles = mockFiles.filter(f => !folderIdsToDelete.includes(f.folderId));
-    mockFolders = mockFolders.filter(f => !folderIdsToDelete.includes(f.id));
+    const response = await fetch(`${API_BASE_URL}/folders/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to delete folder: ${response.status}`);
+    }
   },
 
   getFiles: async (folderId: string): Promise<FileItem[]> => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return mockFiles.filter(f => f.folderId === folderId);
+    const response = await fetch(`${API_BASE_URL}/files?folderId=${folderId}`, {
+      headers: getAuthHeaders(),
+    });
+    const files = await handleResponse(response);
+    return files.map((file: any) => ({
+      ...file,
+      createdAt: new Date(file.createdAt),
+      url: `${API_BASE_URL.replace('/api', '')}${file.url}`,
+      thumbnailUrl: file.thumbnailUrl ? `${API_BASE_URL.replace('/api', '')}${file.thumbnailUrl}` : undefined,
+    }));
   },
 
   uploadFile: async (
@@ -120,77 +137,76 @@ export const api = {
     folderId: string,
     tags: string[]
   ): Promise<FileItem> => {
-    await new Promise(resolve => setTimeout(resolve, 800));
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folderId', folderId);
+    formData.append('tags', tags.join(','));
 
-    const fileType = file.type.startsWith('image/') ? 'image' : 'pdf';
-    const url = URL.createObjectURL(file);
+    const response = await fetch(`${API_BASE_URL}/files/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': authToken ? `Bearer ${authToken}` : '',
+      },
+      body: formData,
+    });
 
-    const newFile: FileItem = {
-      id: `file-${fileIdCounter++}`,
-      name: file.name,
-      folderId,
-      type: fileType,
-      size: file.size,
-      url,
-      thumbnailUrl: fileType === 'image' ? url : undefined,
-      tags,
-      createdAt: new Date(),
+    const uploadedFile = await handleResponse(response);
+    return {
+      ...uploadedFile,
+      createdAt: new Date(uploadedFile.createdAt),
+      url: `${API_BASE_URL.replace('/api', '')}${uploadedFile.url}`,
+      thumbnailUrl: uploadedFile.thumbnailUrl ? `${API_BASE_URL.replace('/api', '')}${uploadedFile.thumbnailUrl}` : undefined,
     };
-
-    mockFiles.push(newFile);
-    return newFile;
   },
 
   deleteFile: async (id: string): Promise<void> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const file = mockFiles.find(f => f.id === id);
-    if (file) {
-      URL.revokeObjectURL(file.url);
+    const response = await fetch(`${API_BASE_URL}/files/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to delete file: ${response.status}`);
     }
-    mockFiles = mockFiles.filter(f => f.id !== id);
   },
 
   updateFileTags: async (fileId: string, tags: string[]): Promise<FileItem> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const file = mockFiles.find(f => f.id === fileId);
-    if (!file) throw new Error('ファイルが見つかりません');
-
-    file.tags = tags;
-    return { ...file };
+    const response = await fetch(`${API_BASE_URL}/files/${fileId}/tags`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ tags }),
+    });
+    const file = await handleResponse(response);
+    return {
+      ...file,
+      createdAt: new Date(file.createdAt),
+      url: `${API_BASE_URL.replace('/api', '')}${file.url}`,
+      thumbnailUrl: file.thumbnailUrl ? `${API_BASE_URL.replace('/api', '')}${file.thumbnailUrl}` : undefined,
+    };
   },
 
   downloadFile: async (fileId: string): Promise<void> => {
-    const file = mockFiles.find(f => f.id === fileId);
-    if (!file) throw new Error('ファイルが見つかりません');
+    const response = await fetch(`${API_BASE_URL}/files/${fileId}/download`, {
+      headers: {
+        'Authorization': authToken ? `Bearer ${authToken}` : '',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('ファイルが見つかりません');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const contentDisposition = response.headers.get('content-disposition');
+    const fileNameMatch = contentDisposition?.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+    const fileName = fileNameMatch ? fileNameMatch[1].replace(/['"]/g, '') : 'download';
 
     const link = document.createElement('a');
-    link.href = file.url;
-    link.download = file.name;
+    link.href = url;
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   },
 };
-
-function buildFolderTree(folders: Folder[]): Folder[] {
-  const folderMap = new Map<string, Folder>();
-
-  folders.forEach(folder => {
-    folderMap.set(folder.id, { ...folder, children: [] });
-  });
-
-  const roots: Folder[] = [];
-
-  folderMap.forEach(folder => {
-    if (folder.parentId === null) {
-      roots.push(folder);
-    } else {
-      const parent = folderMap.get(folder.parentId);
-      if (parent) {
-        parent.children.push(folder);
-      }
-    }
-  });
-
-  return roots;
-}

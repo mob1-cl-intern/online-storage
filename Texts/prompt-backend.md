@@ -6,7 +6,7 @@
 開発言語は TypeScript であり、ライブラリは React です。
 /Workspace/Frontend が React のプロジェクトになりますが、他のツールにより既に作成されている状態です
 
-## バックエンドの構成 (/workspace/Apps/front-end)
+## バックエンドの構成 (/workspace/Apps/Backend)
 アプリケーションのバックエンドです。すでに C# (ASP.NET9) のプロジェクトが用意されています
 バックエンドは UI をもたず、API を提供します
 フォルダは /Workspace/Backend です
