@@ -7,9 +7,10 @@ import '../styles/FileList.css';
 interface FileListProps {
   folderId: string;
   onPreviewFile: (file: FileItem) => void;
+  tagUpdateTrigger?: number;
 }
 
-export function FileList({ folderId, onPreviewFile }: FileListProps) {
+export function FileList({ folderId, onPreviewFile, tagUpdateTrigger }: FileListProps) {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -21,6 +22,10 @@ export function FileList({ folderId, onPreviewFile }: FileListProps) {
     loadFiles();
     loadTags();
   }, [folderId]);
+
+  useEffect(() => {
+    loadTags();
+  }, [tagUpdateTrigger]);
 
   const loadFiles = async () => {
     const files = await api.getFiles(folderId);

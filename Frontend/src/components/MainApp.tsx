@@ -12,11 +12,17 @@ export function MainApp() {
   const [selectedFolderId, setSelectedFolderId] = useState('root');
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [showTagManager, setShowTagManager] = useState(false);
+  const [tagUpdateTrigger, setTagUpdateTrigger] = useState(0);
 
   const handleLogout = async () => {
     if (confirm('ログアウトしますか?')) {
       await logout();
     }
+  };
+
+  const handleCloseTagManager = () => {
+    setShowTagManager(false);
+    setTagUpdateTrigger(prev => prev + 1);
   };
 
   return (
@@ -45,6 +51,7 @@ export function MainApp() {
           <FileList
             folderId={selectedFolderId}
             onPreviewFile={setPreviewFile}
+            tagUpdateTrigger={tagUpdateTrigger}
           />
         </main>
       </div>
@@ -57,7 +64,7 @@ export function MainApp() {
       )}
 
       {showTagManager && (
-        <TagManager onClose={() => setShowTagManager(false)} />
+        <TagManager onClose={handleCloseTagManager} />
       )}
     </div>
   );
