@@ -27,3 +27,9 @@ public class UpdateFileTagsRequestDto
     public List<string> Tags { get; set; } = new();
 }
 
+public class FileAccessTokenDto
+{
+    public string Token { get; set; } = string.Empty;
+    public DateTime ExpiresAt { get; set; }
+}
+

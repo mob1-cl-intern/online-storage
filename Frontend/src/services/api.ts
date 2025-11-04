@@ -119,17 +119,45 @@ export const api = {
     }
   },
 
+  getFileAccessToken: async (fileId: string): Promise<string> => {
+    const response = await fetch(`${API_BASE_URL}/files/${fileId}/access-token`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse(response);
+    return data.token;
+  },
+
   getFiles: async (folderId: string): Promise<FileItem[]> => {
     const response = await fetch(`${API_BASE_URL}/files?folderId=${folderId}`, {
       headers: getAuthHeaders(),
     });
     const files = await handleResponse(response);
-    return files.map((file: any) => ({
-      ...file,
-      createdAt: new Date(file.createdAt),
-      url: `${API_BASE_URL.replace('/api', '')}${file.url}`,
-      thumbnailUrl: file.thumbnailUrl ? `${API_BASE_URL.replace('/api', '')}${file.thumbnailUrl}` : undefined,
-    }));
+    
+    // Get access tokens for all files
+    const filesWithTokens = await Promise.all(
+      files.map(async (file: any) => {
+        try {
+          const token = await api.getFileAccessToken(file.id);
+          const baseUrl = API_BASE_URL.replace('/api', '');
+          return {
+            ...file,
+            createdAt: new Date(file.createdAt),
+            url: `${baseUrl}${file.url}?token=${token}`,
+            thumbnailUrl: file.thumbnailUrl ? `${baseUrl}${file.thumbnailUrl}?token=${token}` : undefined,
+          };
+        } catch (error) {
+          console.error(`Failed to get access token for file ${file.id}:`, error);
+          return {
+            ...file,
+            createdAt: new Date(file.createdAt),
+            url: `${API_BASE_URL.replace('/api', '')}${file.url}`,
+            thumbnailUrl: file.thumbnailUrl ? `${API_BASE_URL.replace('/api', '')}${file.thumbnailUrl}` : undefined,
+          };
+        }
+      })
+    );
+    
+    return filesWithTokens;
   },
 
   uploadFile: async (
@@ -151,12 +179,26 @@ export const api = {
     });
 
     const uploadedFile = await handleResponse(response);
-    return {
-      ...uploadedFile,
-      createdAt: new Date(uploadedFile.createdAt),
-      url: `${API_BASE_URL.replace('/api', '')}${uploadedFile.url}`,
-      thumbnailUrl: uploadedFile.thumbnailUrl ? `${API_BASE_URL.replace('/api', '')}${uploadedFile.thumbnailUrl}` : undefined,
-    };
+    
+    // Get access token for the uploaded file
+    try {
+      const token = await api.getFileAccessToken(uploadedFile.id);
+      const baseUrl = API_BASE_URL.replace('/api', '');
+      return {
+        ...uploadedFile,
+        createdAt: new Date(uploadedFile.createdAt),
+        url: `${baseUrl}${uploadedFile.url}?token=${token}`,
+        thumbnailUrl: uploadedFile.thumbnailUrl ? `${baseUrl}${uploadedFile.thumbnailUrl}?token=${token}` : undefined,
+      };
+    } catch (error) {
+      console.error('Failed to get access token for uploaded file:', error);
+      return {
+        ...uploadedFile,
+        createdAt: new Date(uploadedFile.createdAt),
+        url: `${API_BASE_URL.replace('/api', '')}${uploadedFile.url}`,
+        thumbnailUrl: uploadedFile.thumbnailUrl ? `${API_BASE_URL.replace('/api', '')}${uploadedFile.thumbnailUrl}` : undefined,
+      };
+    }
   },
 
   deleteFile: async (id: string): Promise<void> => {
@@ -176,12 +218,26 @@ export const api = {
       body: JSON.stringify({ tags }),
     });
     const file = await handleResponse(response);
-    return {
-      ...file,
-      createdAt: new Date(file.createdAt),
-      url: `${API_BASE_URL.replace('/api', '')}${file.url}`,
-      thumbnailUrl: file.thumbnailUrl ? `${API_BASE_URL.replace('/api', '')}${file.thumbnailUrl}` : undefined,
-    };
+    
+    // Get access token for the updated file
+    try {
+      const token = await api.getFileAccessToken(file.id);
+      const baseUrl = API_BASE_URL.replace('/api', '');
+      return {
+        ...file,
+        createdAt: new Date(file.createdAt),
+        url: `${baseUrl}${file.url}?token=${token}`,
+        thumbnailUrl: file.thumbnailUrl ? `${baseUrl}${file.thumbnailUrl}?token=${token}` : undefined,
+      };
+    } catch (error) {
+      console.error('Failed to get access token for updated file:', error);
+      return {
+        ...file,
+        createdAt: new Date(file.createdAt),
+        url: `${API_BASE_URL.replace('/api', '')}${file.url}`,
+        thumbnailUrl: file.thumbnailUrl ? `${API_BASE_URL.replace('/api', '')}${file.thumbnailUrl}` : undefined,
+      };
+    }
   },
 
   downloadFile: async (fileId: string): Promise<void> => {

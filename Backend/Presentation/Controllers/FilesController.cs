@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Backend.Application.Interfaces;
 using Backend.Infrastructure.Interfaces;
 using Backend.Presentation.DTOs;
@@ -13,12 +14,18 @@ public class FilesController : ControllerBase
 {
     private readonly IFileService _fileService;
     private readonly IFileStorageService _storageService;
+    private readonly IFileAccessTokenService _tokenService;
     private readonly IConfiguration _configuration;
 
-    public FilesController(IFileService fileService, IFileStorageService storageService, IConfiguration configuration)
+    public FilesController(
+        IFileService fileService, 
+        IFileStorageService storageService, 
+        IFileAccessTokenService tokenService,
+        IConfiguration configuration)
     {
         _fileService = fileService;
         _storageService = storageService;
+        _tokenService = tokenService;
         _configuration = configuration;
     }
 
@@ -110,10 +117,42 @@ public class FilesController : ControllerBase
         });
     }
 
+    [HttpGet("{id}/access-token")]
+    public async Task<ActionResult<FileAccessTokenDto>> GetFileAccessToken(string id)
+    {
+        var file = await _fileService.GetByIdAsync(id);
+        
+        if (file == null)
+        {
+            return NotFound();
+        }
+
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        var token = _tokenService.GenerateAccessToken(id, userId);
+        var expiresAt = DateTime.UtcNow.AddMinutes(5);
+
+        return Ok(new FileAccessTokenDto
+        {
+            Token = token,
+            ExpiresAt = expiresAt
+        });
+    }
+
     [HttpGet("{id}/content")]
     [AllowAnonymous]
-    public async Task<ActionResult> GetFileContent(string id)
+    public async Task<ActionResult> GetFileContent(string id, [FromQuery] string? token)
     {
+        // Validate access token
+        if (string.IsNullOrEmpty(token) || !_tokenService.ValidateAccessToken(token, id))
+        {
+            return Unauthorized(new { message = "Invalid or expired access token" });
+        }
+
         var file = await _fileService.GetByIdAsync(id);
         
         if (file == null)

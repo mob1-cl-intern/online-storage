@@ -31,6 +31,7 @@ builder.Services.AddScoped<ITagRepository, TagRepository>();
 // Add Infrastructure Services
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
+builder.Services.AddScoped<IFileAccessTokenService, FileAccessTokenService>();
 
 // Add Application Services
 builder.Services.AddScoped<IAuthService, AuthService>();
